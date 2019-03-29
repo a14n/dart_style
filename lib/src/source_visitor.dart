@@ -245,13 +245,11 @@ class SourceVisitor extends ThrowingAstVisitor {
       shouldNest = false;
     }
 
-    builder.startSpan();
-    builder.startRule();
+    builder.startRule(Rule.hard());
     if (shouldNest) builder.nestExpression();
-    visitNodes(node.strings, between: splitOrNewline);
+    visitNodes(node.strings, before: splitOrNewline, between: splitOrNewline);
     if (shouldNest) builder.unnest();
     builder.endRule();
-    builder.endSpan();
   }
 
   visitAnnotation(Annotation node) {
@@ -386,7 +384,26 @@ class SourceVisitor extends ThrowingAstVisitor {
     //         argument &&
     //         argument;
     var isArrowBody = node.parent is ExpressionFunctionBody;
-    if (!isArrowBody) builder.nestExpression();
+
+    // Adam-style return
+    Token keywordForAdamStyle;
+    if (node.operator.type == TokenType.AMPERSAND_AMPERSAND ||
+        node.operator.type == TokenType.BAR_BAR ||
+        node.operator.type == TokenType.QUESTION_QUESTION) {
+      var parent = node.parent;
+      if (parent is ReturnStatement) {
+        keywordForAdamStyle = parent.returnKeyword;
+      } else if (parent is YieldStatement) {
+        keywordForAdamStyle = parent.yieldKeyword;
+      }
+    }
+
+    if (keywordForAdamStyle != null) {
+      builder.unnest();
+      builder.indent(keywordForAdamStyle.length - node.operator.length);
+    } else if (!isArrowBody) {
+      builder.nestExpression();
+    }
 
     // Start lazily so we don't force the operator to split if a line comment
     // appears before the first operand.
@@ -400,11 +417,21 @@ class SourceVisitor extends ThrowingAstVisitor {
       if (e is BinaryExpression && e.operator.type.precedence == precedence) {
         traverse(e.leftOperand);
 
-        space();
-        token(e.operator);
+        if (keywordForAdamStyle != null) {
+          splitOrNewline();
+          token(e.operator);
+          space();
+        } else {
+          space();
+          token(e.operator);
+          split();
+        }
 
-        split();
         traverse(e.rightOperand);
+      } else if (keywordForAdamStyle != null) {
+        builder.indent(node.operator.length + 1 /* space */);
+        visit(e);
+        builder.unindent();
       } else {
         visit(e);
       }
@@ -418,7 +445,12 @@ class SourceVisitor extends ThrowingAstVisitor {
 
     builder.endBlockArgumentNesting();
 
-    if (!isArrowBody) builder.unnest();
+    if (keywordForAdamStyle != null) {
+      builder.unindent();
+      builder.nestExpression();
+    } else if (!isArrowBody) {
+      builder.unnest();
+    }
     builder.endSpan();
     builder.endRule();
   }
@@ -435,22 +467,32 @@ class SourceVisitor extends ThrowingAstVisitor {
       //
       //     if (condition) {
       //     } else ...
-      if (node.parent is IfStatement) {
-        var ifStatement = node.parent as IfStatement;
-        if (ifStatement.elseStatement != null &&
-            ifStatement.thenStatement == node) {
-          newline();
-        }
+      var parent = node.parent;
+      if (parent is IfStatement &&
+          parent.elseStatement != null &&
+          parent.thenStatement == node) {
+        newline();
       }
 
       token(node.rightBracket);
       return;
     }
 
+    var isOneLiner = node.statements.length == 1 &&
+        node.parent is BlockFunctionBody &&
+        (node.parent?.parent?.parent is FunctionDeclaration ||
+            node.parent?.parent?.parent is MethodDeclaration ||
+            node.parent?.parent?.parent?.parent?.parent
+                is ExpressionStatement ||
+            node.parent?.parent?.parent is NamedExpression);
+    isOneLiner = false;
+
     // If the block is a function body, it may get expression-level indentation,
     // so handle it specially. Otherwise, just bump the indentation and keep it
     // in the current block.
-    if (node.parent is BlockFunctionBody) {
+    if (isOneLiner) {
+      _beginBody(node.leftBracket, space: true);
+    } else if (node.parent is BlockFunctionBody) {
       _startLiteralBody(node.leftBracket);
     } else {
       _beginBody(node.leftBracket);
@@ -458,10 +500,12 @@ class SourceVisitor extends ThrowingAstVisitor {
 
     var needsDouble = true;
     for (var statement in node.statements) {
-      if (needsDouble) {
-        twoNewlines();
-      } else {
-        oneOrTwoNewlines();
+      if (!isOneLiner) {
+        if (needsDouble) {
+          twoNewlines();
+        } else {
+          oneOrTwoNewlines();
+        }
       }
 
       visit(statement);
@@ -476,9 +520,11 @@ class SourceVisitor extends ThrowingAstVisitor {
       }
     }
 
-    if (node.statements.isNotEmpty) newline();
+    if (node.statements.isNotEmpty && !isOneLiner) newline();
 
-    if (node.parent is BlockFunctionBody) {
+    if (isOneLiner) {
+      _endBody(node.rightBracket, space: true);
+    } else if (node.parent is BlockFunctionBody) {
       _endLiteralBody(node.rightBracket,
           forceSplit: node.statements.isNotEmpty);
     } else {
@@ -876,6 +922,9 @@ class SourceVisitor extends ThrowingAstVisitor {
       builder.indent(6);
     } else {
       // Shift the itself ":" forward.
+      // builder.indent(node.body is BlockFunctionBody
+      //     ? Indent.constructorInitializerWithoutBlockBody
+      //     : Indent.constructorInitializer);
       builder.indent(Indent.constructorInitializer);
 
       // If the parameters or initializers split, put the ":" on its own line.
@@ -1083,11 +1132,24 @@ class SourceVisitor extends ThrowingAstVisitor {
 
     if (_isInLambda(node)) builder.endSpan();
 
-    builder.startBlockArgumentNesting();
+    // If this function invocation appears in an argument list with trailing
+    // comma, don't add extra nesting to preserve normal indentation.
+    var isArgWithTrailingComma = false;
+    var parent = node.parent;
+    if (parent is FunctionExpression) {
+      var argList = parent?.parent;
+      if (argList is NamedExpression) argList = argList.parent;
+      if (argList is ArgumentList &&
+          argList.arguments.last.endToken.next.type == TokenType.COMMA) {
+        isArgWithTrailingComma = true;
+      }
+    }
+
+    if (!isArgWithTrailingComma) builder.startBlockArgumentNesting();
     builder.startSpan();
     visit(node.expression);
     builder.endSpan();
-    builder.endBlockArgumentNesting();
+    if (!isArgWithTrailingComma) builder.endBlockArgumentNesting();
 
     if (node.expression is BinaryExpression) builder.endRule();
 
@@ -1625,14 +1687,7 @@ class SourceVisitor extends ThrowingAstVisitor {
         // style guide, we should at least format it as well as we can.
         builder.indent();
         builder.startRule();
-
-        // If there is an else clause, always split before both the then and
-        // else statements.
-        if (node.elseStatement != null) {
-          builder.writeWhitespace(Whitespace.newline);
-        } else {
-          builder.split(nest: false, space: true);
-        }
+        builder.writeWhitespace(Whitespace.newline);
 
         visit(clause);
 
@@ -2612,7 +2667,7 @@ class SourceVisitor extends ThrowingAstVisitor {
       builder.indent();
       builder.startRule();
 
-      builder.split(nest: false, space: true);
+      newline();
       visit(body);
 
       builder.endRule();

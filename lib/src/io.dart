@@ -4,6 +4,7 @@
 
 library dart_style.src.io;
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
@@ -72,11 +73,18 @@ bool processFile(FormatterOptions options, File file, {String label}) {
       pageWidth: options.pageWidth,
       fixes: options.fixes);
   try {
-    var source = SourceCode(file.readAsStringSync(), uri: file.path);
+    var fileContent = file.readAsStringSync();
+    var content = _commentFormatterOff(fileContent);
+    var source = SourceCode(content, uri: file.path);
     options.reporter.beforeFile(file, label);
     var output = formatter.formatSource(source);
+    output = SourceCode(_uncommentFormatterOff(output.text),
+        isCompilationUnit: output.isCompilationUnit,
+        selectionLength: output.selectionLength,
+        selectionStart: output.selectionStart,
+        uri: output.uri);
     options.reporter
-        .afterFile(file, label, output, changed: source.text != output.text);
+        .afterFile(file, label, output, changed: fileContent != output.text);
     return true;
   } on FormatterException catch (err) {
     var color = Platform.operatingSystem != "windows" &&
@@ -95,4 +103,45 @@ $stack''');
   }
 
   return false;
+}
+
+const _offSectionPrefix = '//';
+
+String _commentFormatterOff(String text) {
+  var off = false;
+  var output = StringBuffer();
+  for (var line in LineSplitter.split(text)) {
+    if (line.trim() == '// @formatter:off') {
+      off = true;
+    } else if (line.trim() == '// @formatter:on') {
+      off = false;
+    } else if (off) {
+      output.writeln('$_offSectionPrefix$line');
+    }
+    output.writeln(line);
+  }
+  return output.toString();
+}
+
+String _uncommentFormatterOff(String text) {
+  var off = false;
+  var output = StringBuffer();
+  var iter = LineSplitter.split(text).iterator;
+
+  while (iter.moveNext()) {
+    var line = iter.current;
+    if (line.trim() == '// @formatter:off') {
+      off = true;
+      output.writeln(line);
+    } else if (line.trim() == '// @formatter:on') {
+      off = false;
+      output.writeln(line);
+    } else if (off) {
+      output.writeln(line.substring(_offSectionPrefix.length));
+      iter.moveNext();
+    } else {
+      output.writeln(line);
+    }
+  }
+  return output.toString();
 }

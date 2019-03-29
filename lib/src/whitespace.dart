@@ -17,6 +17,9 @@ class Indent {
 
   /// The ":" on a wrapped constructor initialization list.
   static const constructorInitializer = 4;
+
+  /// The ":" on a wrapped constructor initialization list with body.
+  static const constructorInitializerWithoutBlockBody = 2;
 }
 
 /// The kind of pending whitespace that has been "written", but not actually
