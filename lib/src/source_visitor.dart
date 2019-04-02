@@ -456,6 +456,8 @@ class SourceVisitor extends ThrowingAstVisitor {
   }
 
   visitBlock(Block node) {
+    var parent = node.parent;
+
     // Treat empty blocks specially. In most cases, they are not allowed to
     // split. However, an empty block as the then statement of an if with an
     // else is always split.
@@ -467,25 +469,46 @@ class SourceVisitor extends ThrowingAstVisitor {
       //
       //     if (condition) {
       //     } else ...
-      var parent = node.parent;
       if (parent is IfStatement &&
           parent.elseStatement != null &&
           parent.thenStatement == node) {
         newline();
+      } else {
+        // space();
       }
 
       token(node.rightBracket);
       return;
     }
 
-    var isOneLiner = node.statements.length == 1 &&
-        node.parent is BlockFunctionBody &&
-        (node.parent?.parent?.parent is FunctionDeclaration ||
-            node.parent?.parent?.parent is MethodDeclaration ||
-            node.parent?.parent?.parent?.parent?.parent
-                is ExpressionStatement ||
-            node.parent?.parent?.parent is NamedExpression);
-    isOneLiner = false;
+    var isOneLiner = false;
+    if (node.statements.length == 1 &&
+        node.statements.first.beginToken.precedingComments == null &&
+        node.rightBracket.precedingComments == null &&
+        parent is BlockFunctionBody) {
+      // doesn't work correctly when statement is splitted (bad indentation)
+      // isOneLiner =
+      //     parent.keyword == null && node.statements.first is! ReturnStatement;
+
+      var container = parent?.parent?.parent;
+
+      if (container is MethodDeclaration || container is FunctionDeclaration) {
+        var statement = node.statements.first;
+        if (!(statement is ReturnStatement || statement is YieldStatement)) {
+          isOneLiner = true;
+        }
+      } else if (container is AssignmentExpression ||
+          container is VariableDeclaration) {
+        isOneLiner = true;
+      } else {
+        if (container is NamedExpression) container = container?.parent;
+        if (container is ArgumentList &&
+            container.arguments.last.endToken.next.type == TokenType.COMMA) {
+          isOneLiner = true;
+        }
+      }
+    }
+    //isOneLiner = false;
 
     // If the block is a function body, it may get expression-level indentation,
     // so handle it specially. Otherwise, just bump the indentation and keep it
