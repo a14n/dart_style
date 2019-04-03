@@ -212,3 +212,9 @@ function(
     a,
   ),
 );
+>>> avoid extra-indent for function declaration
+function() => P(p,);
+<<<
+function() => P(
+  p,
+);

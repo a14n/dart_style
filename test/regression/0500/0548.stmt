@@ -37,8 +37,8 @@ StatementBuilder assignConst(String variable, [TypeBuilder type]) =>
 <<<
   StatementBuilder assignConst(String variable, [TypeBuilder type]) =>
       new _AsAssign(
-        this,
-        variable,
-        keyword: _AsAssignType.asConst,
-        type: type,
-      ).asStatement();
+    this,
+    variable,
+    keyword: _AsAssignType.asConst,
+    type: type,
+  ).asStatement();
