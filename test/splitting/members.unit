@@ -37,3 +37,23 @@ class Foo {
   covariant VeryLongTypeAnnotation
       field;
 }
+>>> avoid extra-indent for getter declaration
+class Foo {
+  Type get getter => P(p,);
+}
+<<<
+class Foo {
+  Type get getter => P(
+    p,
+  );
+}
+>>> avoid extra-indent for method declaration
+class Foo {
+  Type method() => P(p,);
+}
+<<<
+class Foo {
+  Type method() => P(
+    p,
+  );
+}
