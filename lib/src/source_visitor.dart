@@ -8,6 +8,7 @@ import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/src/generated/source.dart';
+import 'oneliner_block_visitor.dart';
 
 import 'argument_list_visitor.dart';
 import 'call_chain_visitor.dart';
@@ -481,34 +482,7 @@ class SourceVisitor extends ThrowingAstVisitor {
       return;
     }
 
-    var isOneLiner = false;
-    if (node.statements.length == 1 &&
-        node.statements.first.beginToken.precedingComments == null &&
-        node.rightBracket.precedingComments == null &&
-        parent is BlockFunctionBody) {
-      // doesn't work correctly when statement is splitted (bad indentation)
-      // isOneLiner =
-      //     parent.keyword == null && node.statements.first is! ReturnStatement;
-
-      var container = parent?.parent?.parent;
-
-      if (container is MethodDeclaration || container is FunctionDeclaration) {
-        var statement = node.statements.first;
-        if (!(statement is ReturnStatement || statement is YieldStatement)) {
-          isOneLiner = true;
-        }
-      } else if (container is AssignmentExpression ||
-          container is VariableDeclaration) {
-        isOneLiner = true;
-      } else {
-        if (container is NamedExpression) container = container?.parent;
-        if (container is ArgumentList &&
-            container.arguments.last.endToken.next.type == TokenType.COMMA) {
-          isOneLiner = true;
-        }
-      }
-    }
-    //isOneLiner = false;
+    var isOneLiner = OneLinerBlockVisitor.isOneLiner(node);
 
     // If the block is a function body, it may get expression-level indentation,
     // so handle it specially. Otherwise, just bump the indentation and keep it
