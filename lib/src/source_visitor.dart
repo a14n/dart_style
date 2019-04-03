@@ -1132,21 +1132,13 @@ class SourceVisitor extends ThrowingAstVisitor {
     var needExtraIndent = true;
     var parent = node.parent;
     if (parent is FunctionExpression) {
-      var functionParent = parent?.parent;
       // If this function invocation appears in an argument list with trailing
       // comma, don't add extra nesting to preserve normal indentation.
-      ArgumentList argList = functionParent is ArgumentList
-          ? functionParent
-          : functionParent is NamedExpression &&
-                  functionParent?.parent is ArgumentList
-              ? functionParent?.parent
-              : null;
-      if (argList != null &&
-          argList.arguments.last.endToken.next.type == TokenType.COMMA) {
+      if (_isInArgListWithTrailingComma(parent)) {
         needExtraIndent = false;
       }
       // We also avoid extra indent for function declaration
-      if (functionParent is FunctionDeclaration) {
+      else if (parent.parent is FunctionDeclaration) {
         needExtraIndent = false;
       }
     }
@@ -3495,4 +3487,18 @@ class SourceVisitor extends ThrowingAstVisitor {
   /// Gets the 1-based column number that the beginning of [token] lies on.
   int _startColumn(Token token) =>
       _lineInfo.getLocation(token.offset).columnNumber;
+
+  static bool _isInArgListWithTrailingComma(AstNode node) {
+    var parent = node.parent;
+    ArgumentList argList = parent is ArgumentList
+        ? parent
+        : parent is NamedExpression && parent?.parent is ArgumentList
+            ? parent?.parent
+            : null;
+    if (argList != null &&
+        argList.arguments.last.endToken.next.type == TokenType.COMMA) {
+      return true;
+    }
+    return false;
+  }
 }
