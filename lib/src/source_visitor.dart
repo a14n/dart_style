@@ -1274,7 +1274,7 @@ class SourceVisitor extends ThrowingAstVisitor {
       namedRule.beforeArgument(builder.split(space: requiredParams.isNotEmpty));
 
       // "[" or "{" for optional parameters.
-      token(node.leftDelimiter);
+      token(node.leftDelimiter, after: splitOrNewline);
 
       for (var param in optionalParams) {
         visit(param);
@@ -1291,7 +1291,7 @@ class SourceVisitor extends ThrowingAstVisitor {
       builder.endRule();
 
       // "]" or "}" for optional parameters.
-      token(node.rightDelimiter);
+      token(node.rightDelimiter, before: soloSplit);
     }
 
     _metadataRules.removeLast();
