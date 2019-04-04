@@ -359,12 +359,14 @@ class SourceVisitor extends ThrowingAstVisitor {
   }
 
   visitAssignmentExpression(AssignmentExpression node) {
-    builder.nestExpression();
+    var preventSplit = _needToPreventSplit(node.rightHandSide);
 
+    if (preventSplit) builder.preventSplit();
+    builder.nestExpression();
     visit(node.leftHandSide);
     _visitAssignment(node.operator, node.rightHandSide);
-
     builder.unnest();
+    if (preventSplit) builder.endPreventSplit();
   }
 
   visitAwaitExpression(AwaitExpression node) {
@@ -1886,12 +1888,16 @@ class SourceVisitor extends ThrowingAstVisitor {
   }
 
   visitMapLiteralEntry(MapLiteralEntry node) {
+    var preventSplit = _needToPreventSplit(node.value);
+
+    if (preventSplit) builder.preventSplit();
     builder.nestExpression();
     visit(node.key);
     token(node.separator);
     soloSplit();
     visit(node.value);
     builder.unnest();
+    if (preventSplit) builder.endPreventSplit();
   }
 
   visitMethodDeclaration(MethodDeclaration node) {
@@ -2452,6 +2458,9 @@ class SourceVisitor extends ThrowingAstVisitor {
   /// split between the name and argument forces the argument list to split
   /// too.
   void visitNamedArgument(NamedExpression node, [NamedRule rule]) {
+    var preventSplit = _needToPreventSplit(node.expression);
+
+    if (preventSplit) builder.preventSplit();
     builder.nestExpression();
     builder.startSpan();
     visit(node.name);
@@ -2468,6 +2477,7 @@ class SourceVisitor extends ThrowingAstVisitor {
     visit(node.expression);
     builder.endSpan();
     builder.unnest();
+    if (preventSplit) builder.endPreventSplit();
   }
 
   /// Visits the `=` and the following expression in any place where an `=`
@@ -3501,4 +3511,8 @@ class SourceVisitor extends ThrowingAstVisitor {
     }
     return false;
   }
+
+  bool _needToPreventSplit(Expression rightHandSideExpression) =>
+      rightHandSideExpression is StringLiteral &&
+      rightHandSideExpression is! AdjacentStrings;
 }
