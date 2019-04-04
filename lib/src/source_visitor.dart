@@ -919,10 +919,10 @@ class SourceVisitor extends ThrowingAstVisitor {
       builder.indent(6);
     } else {
       // Shift the itself ":" forward.
-      // builder.indent(node.body is BlockFunctionBody
-      //     ? Indent.constructorInitializerWithoutBlockBody
-      //     : Indent.constructorInitializer);
-      builder.indent(Indent.constructorInitializer);
+      builder.indent(node.body is BlockFunctionBody
+          ? Indent.constructorInitializer
+          : Indent.constructorInitializerWithoutBlockBody);
+      // builder.indent(Indent.constructorInitializer);
 
       // If the parameters or initializers split, put the ":" on its own line.
       split();
