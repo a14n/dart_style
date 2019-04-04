@@ -475,7 +475,7 @@ class SourceVisitor extends ThrowingAstVisitor {
           parent.thenStatement == node) {
         newline();
       } else {
-        // space();
+        space();
       }
 
       token(node.rightBracket);
