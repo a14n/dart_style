@@ -107,7 +107,7 @@ class ArgumentListVisitor {
     //         another: argument);
     if (functionsStart != null &&
         arguments[0] is NamedExpression &&
-        (functionsStart > 0 || functionsEnd < arguments.length)) {
+        functionsEnd < arguments.length) {
       functionsStart = null;
     }
 
