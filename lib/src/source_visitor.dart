@@ -246,6 +246,21 @@ class SourceVisitor extends ThrowingAstVisitor {
       shouldNest = false;
     }
 
+    // Don't add extra indentation in return or yield:
+    //
+    //     return
+    //         'bla'
+    //         'bla';
+    //
+    // instead of:
+    //
+    //     return
+    //         'bla'
+    //             'bla';
+    if (parent is ReturnStatement || parent is YieldStatement) {
+      shouldNest = false;
+    }
+
     builder.startRule(Rule.hard());
     if (shouldNest) builder.nestExpression();
     visitNodes(node.strings, before: splitOrNewline, between: splitOrNewline);
