@@ -45,7 +45,6 @@ class OneLinerBlockVisitor extends GeneralizingAstVisitor<bool> {
     // we allow only some elements that add indentation (otherwise it doesn't work correctly when statement is splitted)
     bool isAllowed = false;
     if (container is MethodDeclaration ||
-        container is FunctionDeclaration ||
         container is AssignmentExpression ||
         container is VariableDeclaration) {
       isAllowed = true;
